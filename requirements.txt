@@ -1,0 +1,2 @@
+setuptools==68.0.0
+sphinx-tabs==3.4.1
