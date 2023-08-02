@@ -91,6 +91,6 @@ binary.emit_binary('b.wasm')
 The complete documentation can be found [here](https://brewasm-project.readthedocs.io/en/latest/).
 
 ## Publications
-[BREWasm: A General Static Binary Rewriting Framework for WebAssembly]()
+[BREWasm: A General Static Binary Rewriting Framework for WebAssembly](), Shangtong Cao, Ningyu He, Yao Guo, Haoyu Wang.
 
 If you have used BREWasm in academic work, please consider citing our paper.
