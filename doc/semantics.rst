@@ -213,9 +213,9 @@ Function
          # Initialize a semantics rewriter of the function semantics
          function_rewriter = SemanticRewriter.Function(binary)
          # Define the instructions of function
-         funcbody = [Instruction(LocalGet, 0), Instruction(LocalGet, 1), Instruction(I32Add, 0), Instruction(Nop)]
+         func_body = [Instruction(LocalGet, 0), Instruction(LocalGet, 1), Instruction(I32Add, 0), Instruction(Nop)]
          # Insert a internal function in the binary
-         function_rewriter.insert_internal_function(idx=1, params_type=[I32, I32], results_type=[I32], local_vec=[Local(0, I32), Local(1, I64)], funcbody)
+         function_rewriter.insert_internal_function(idx=1, params_type=[I32, I32], results_type=[I32], local_vec=[Local(0, I32), Local(1, I64)], func_body=uncbody)
 
 
    .. function:: insertIndirectFunction   (idx, params_type, results_type, local_vec, func_body):
