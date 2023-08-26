@@ -9,7 +9,7 @@ Install BREWasm::
 
     python3 -m pip install BREWasm
 
-``BREWasm`` requires Python 3.8 or newer.
+``BREWasm`` requires Python 3.10 or newer.
 
 
 Usage
