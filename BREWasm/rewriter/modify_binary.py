@@ -36,23 +36,30 @@ class ModifyBinary:
 
     def emit_binary(self, path):
         file_path = self.module.path
-        if not os.path.samefile(self.module.path, path):
-            if os.path.isfile(path):
-                os.remove(path)
-            copyfile(self.module.path, path)
-            file_path = path
 
-        self.change_custom_name_section(self.module.custom_secs, file_path)
-        self.change_type_section(self.module.type_sec, file_path)
-        self.change_import_section(self.module.import_sec, file_path)
-        self.change_export_section(self.module.export_sec, file_path)
-        self.change_func_section(self.module.func_sec, file_path)
-        self.change_code_section(self.module.code_sec, file_path)
-        self.change_table_section(self.module.table_sec, file_path)
-        self.change_elem_section(self.module.elem_sec, file_path)
-        self.change_memory_section(self.module.mem_sec, file_path)
-        self.change_data_section(self.module.data_sec, file_path)
-        self.change_global_section(self.module.global_sec, file_path)
+        if os.path.isfile(path):
+            if not os.path.samefile(self.module.path, path):
+                os.remove(path)
+
+        file_path = path
+        with open(path, "wb+") as f:
+            magic_version_number = struct.pack("II", self.module.magic, self.module.version)
+            f.write(magic_version_number)
+            f.close()
+
+        self.modify_custom_name_section(self.module.custom_secs, file_path)
+        self.modify_type_section(self.module.type_sec, file_path)
+        self.modify_import_section(self.module.import_sec, file_path)
+        self.modify_func_section(self.module.func_sec, file_path)
+        self.modify_table_section(self.module.table_sec, file_path)
+        self.modify_memory_section(self.module.mem_sec, file_path)
+        self.modify_global_section(self.module.global_sec, file_path)
+        self.modify_export_section(self.module.export_sec, file_path)
+        self.modify_start_section(self.module.start_sec, file_path)
+        self.modify_elem_section(self.module.elem_sec, file_path)
+        self.modify_code_section(self.module.code_sec, file_path)
+        self.modify_data_section(self.module.data_sec, file_path)
+
 
     def get_import_func_list(self):
         import_func_list = []
@@ -130,9 +137,9 @@ class ModifyBinary:
 
         self.fix_export_section_for_import(import_func_id)
 
-        self.change_type_section(self.module.type_sec)
+        self.modify_type_section(self.module.type_sec)
 
-        self.change_import_section(self.module.import_sec)
+        self.modify_import_section(self.module.import_sec)
 
         return import_func_id
 
@@ -163,7 +170,7 @@ class ModifyBinary:
 
         self.module.code_sec.insert(func_id, insert_code)
 
-        self.change_code_section(self.module.code_sec)
+        self.modify_code_section(self.module.code_sec)
         return (func_id + import_func_num)
 
     def add_functype(self, functype):
@@ -173,7 +180,7 @@ class ModifyBinary:
         insert_index = len(self.module.type_sec)
         self.module.type_sec.append(functype)
 
-        self.change_type_section(self.module.type_sec)
+        self.modify_type_section(self.module.type_sec)
         return insert_index
 
     def append_global_variable(self, valtype, value):
@@ -212,7 +219,7 @@ class ModifyBinary:
         else:
             self.module.func_sec.insert(func_id, func_sec_type)
 
-        self.change_func_section(self.module.func_sec)
+        self.modify_func_section(self.module.func_sec)
 
         return func_id
 
@@ -222,7 +229,7 @@ class ModifyBinary:
             if export_item.desc.tag == 0 and export_item.desc.idx >= (func_id + self.get_import_func_num()):
                 export_item.desc.idx += 1
 
-        self.change_export_section(self.module.export_sec)
+        self.modify_export_section(self.module.export_sec)
 
     def fix_export_section_for_import(self, func_id):
 
@@ -230,7 +237,7 @@ class ModifyBinary:
             if export_item.desc.tag == 0 and export_item.desc.idx >= func_id:
                 export_item.desc.idx += 1
 
-        self.change_export_section(self.module.export_sec)
+        self.modify_export_section(self.module.export_sec)
 
     def add_new_local_to_func(self, func_id, local_type):
         self.module.code_sec[func_id].locals.append(Locals(1, local_type))
@@ -331,7 +338,7 @@ class ModifyBinary:
             for _, func_idx in enumerate(elem.init):
                 if func_idx >= func_id:
                     elem.init[_] += 1
-        self.change_elem_section(self.module.elem_sec)
+        self.modify_elem_section(self.module.elem_sec)
 
     def fix_instruction_from_expr(self, expr, func_id, type_id, is_new_functype):
 
@@ -377,7 +384,7 @@ class ModifyBinary:
         for i in self.module.import_sec:
             if i.desc.func_type >= type_id:
                 i.desc.func_type += 1
-        self.change_import_section(self.module.import_sec)
+        self.modify_import_section(self.module.import_sec)
 
     def fix_section_range(self, sec_id, change, start, custom_sec_id=None):
 
@@ -403,7 +410,7 @@ class ModifyBinary:
                     custom.start += change
                     custom.end += change
 
-    def change_custom_name_section(self, custom_vec: list, file_path):
+    def modify_custom_name_section(self, custom_vec: list, file_path):
 
         for _, custom in enumerate(custom_vec):
             if custom.name == "name":
@@ -469,45 +476,52 @@ class ModifyBinary:
                         dataname_bytes += bytes(dataname.name, encoding="utf-8")
                     name_section_bytes += (bytes([0x09]) + LEB128U.encode(len(dataname_bytes))) + dataname_bytes
 
-                with open(os.path.abspath(file_path), "rb+") as f:
-                    file_bytes = f.read()
-                    custom = self.module.section_range[SecCustomID][_]
-                    start = custom.start
-                    end = custom.end
-                    name_section_bytes = bytes([0x00]) + LEB128U.encode(len(name_section_bytes)) + name_section_bytes
-                    file_new_bytes = file_bytes[:start] + name_section_bytes + file_bytes[end:]
-                    change = len(name_section_bytes) - (end - start)
+                if os.path.isfile(file_path):
+                    f = open(file_path, "r+b")
+                else:
+                    f = open(file_path, "w+b")
+                file_bytes = f.read()
+                custom = self.module.section_range[SecCustomID][_]
+                start = custom.start
+                end = custom.end
+                name_section_bytes = bytes([0x00]) + LEB128U.encode(len(name_section_bytes)) + name_section_bytes
+                file_new_bytes = file_bytes[:start] + name_section_bytes + file_bytes[end:]
+                change = len(name_section_bytes) - (end - start)
 
-                    custom.end = custom.start + len(name_section_bytes)
-                    self.fix_section_range(SecCustomID, change, custom.start, _)
-                    f.seek(0)
-                    f.truncate()
-                    f.write(file_new_bytes)
+                custom.end = custom.start + len(name_section_bytes)
+                self.fix_section_range(SecCustomID, change, custom.start, _)
+                f.seek(0)
+                f.truncate()
+                f.write(file_new_bytes)
+                f.close()
             else:
                 custom_section_bytes = bytes()
                 custom_section_bytes += LEB128U.encode(len(custom.name))
                 custom_section_bytes += bytes(custom.name, encoding="utf-8")
                 custom_section_bytes += custom.custom_sec_data
 
-                with open(os.path.abspath(file_path), "rb+") as f:
-                    file_bytes = f.read()
-                    custom = self.module.section_range[SecCustomID][_]
-                    start = custom.start
-                    end = custom.end
-                    custom_section_bytes = bytes([0x00]) + LEB128U.encode(
-                        len(custom_section_bytes)) + custom_section_bytes
-                    file_new_bytes = file_bytes[:start] + custom_section_bytes + file_bytes[end:]
-                    change = len(custom_section_bytes) - (end - start)
+                if os.path.isfile(file_path):
+                    f = open(file_path, "r+b")
+                else:
+                    f = open(file_path, "w+b")
+                file_bytes = f.read()
+                custom = self.module.section_range[SecCustomID][_]
+                start = custom.start
+                end = custom.end
+                custom_section_bytes = bytes([0x00]) + LEB128U.encode(
+                    len(custom_section_bytes)) + custom_section_bytes
+                file_new_bytes = file_bytes[:start] + custom_section_bytes + file_bytes[end:]
+                change = len(custom_section_bytes) - (end - start)
 
-                    custom.end = custom.start + len(custom_section_bytes)
-                    self.fix_section_range(SecCustomID, change, custom.start, _)
-                    f.seek(0)
-                    f.truncate()
-                    f.write(file_new_bytes)
-
+                custom.end = custom.start + len(custom_section_bytes)
+                self.fix_section_range(SecCustomID, change, custom.start, _)
+                f.seek(0)
+                f.truncate()
+                f.write(file_new_bytes)
+                f.close()
         return None
 
-    def change_import_section(self, import_vec: list, file_path):
+    def modify_import_section(self, import_vec: list, file_path):
 
         import_vec_len = len(import_vec)
         import_vec_len_bytes = LEB128U.encode(import_vec_len)
@@ -531,25 +545,29 @@ class ModifyBinary:
                 import_vec_bytes += self.write_global_type(i.desc.global_type)
         import_section_bytes = bytes([0x02]) + LEB128U.encode(len(import_vec_bytes)) + import_vec_bytes
 
-        with open(os.path.abspath(file_path), "rb+") as f:
-            file_bytes = f.read()
-            file_new_bytes = file_bytes[
-                             :self.module.section_range[SecImportID].start] + import_section_bytes + file_bytes[
-                                                                                                     self.module.section_range[
-                                                                                                         SecImportID].end:]
-            change = len(import_section_bytes) - (
-                    self.module.section_range[SecImportID].end - self.module.section_range[SecImportID].start)
+        if os.path.isfile(file_path):
+            f = open(file_path, "r+b")
+        else:
+            f = open(file_path, "w+b")
+        file_bytes = f.read()
+        file_new_bytes = file_bytes[
+                         :self.module.section_range[SecImportID].start] + import_section_bytes + file_bytes[
+                                                                                                 self.module.section_range[
+                                                                                                     SecImportID].end:]
+        change = len(import_section_bytes) - (
+                self.module.section_range[SecImportID].end - self.module.section_range[SecImportID].start)
 
-            self.module.section_range[SecImportID].end = self.module.section_range[SecImportID].start + len(
-                import_section_bytes)
-            self.fix_section_range(SecImportID, change, self.module.section_range[SecImportID].start)
-            f.seek(0)
-            f.truncate()
-            f.write(file_new_bytes)
+        self.module.section_range[SecImportID].end = self.module.section_range[SecImportID].start + len(
+            import_section_bytes)
+        self.fix_section_range(SecImportID, change, self.module.section_range[SecImportID].start)
+        f.seek(0)
+        f.truncate()
+        f.write(file_new_bytes)
 
+        f.close()
         return import_section_bytes
 
-    def change_export_section(self, export_vec: list, file_path):
+    def modify_export_section(self, export_vec: list, file_path):
         export_vec_len = len(export_vec)
         export_vec_len_bytes = LEB128U.encode(export_vec_len)
         export_vec_bytes = bytes()
@@ -564,58 +582,54 @@ class ModifyBinary:
 
         export_section_bytes = bytes([0x07]) + LEB128U.encode(len(export_vec_bytes)) + export_vec_bytes
 
-        with open(os.path.abspath(file_path), "rb+") as f:
+        if os.path.isfile(file_path):
+            f = open(file_path, "r+b")
+        else:
+            f = open(file_path, "w+b")
+        file_bytes = f.read()
+        file_new_bytes = file_bytes[
+                         :self.module.section_range[SecExportID].start] + export_section_bytes + file_bytes[
+                                                                                                 self.module.section_range[
+                                                                                                     SecExportID].end:]
+        change = len(export_section_bytes) - (
+                self.module.section_range[SecExportID].end - self.module.section_range[SecExportID].start)
+
+        self.module.section_range[SecExportID].end = self.module.section_range[SecExportID].start + len(
+            export_section_bytes)
+        self.fix_section_range(SecExportID, change, self.module.section_range[SecExportID].start)
+        f.seek(0)
+        f.truncate()
+        f.write(file_new_bytes)
+        f.close()
+        return export_section_bytes
+
+    def modify_start_section(self, start_funcid: list, file_path):
+        if start_funcid != None:
+            start_funcid_bytes = LEB128U.encode(start_funcid)
+            start_section_bytes = bytes([0x08]) + LEB128U.encode(len(start_funcid_bytes)) + start_funcid_bytes
+
+            if os.path.isfile(file_path):
+                f = open(file_path, "r+b")
+            else:
+                f = open(file_path, "w+b")
             file_bytes = f.read()
             file_new_bytes = file_bytes[
-                             :self.module.section_range[SecExportID].start] + export_section_bytes + file_bytes[
+                             :self.module.section_range[SecStartID].start] + start_section_bytes + file_bytes[
                                                                                                      self.module.section_range[
-                                                                                                         SecExportID].end:]
-            change = len(export_section_bytes) - (
-                    self.module.section_range[SecExportID].end - self.module.section_range[SecExportID].start)
+                                                                                                         SecStartID].end:]
+            change = len(start_section_bytes) - (
+                    self.module.section_range[SecStartID].end - self.module.section_range[SecStartID].start)
 
-            self.module.section_range[SecExportID].end = self.module.section_range[SecExportID].start + len(
-                export_section_bytes)
-            self.fix_section_range(SecExportID, change, self.module.section_range[SecExportID].start)
+            self.module.section_range[SecStartID].end = self.module.section_range[SecStartID].start + len(
+                start_section_bytes)
+            self.fix_section_range(SecStartID, change, self.module.section_range[SecStartID].start)
             f.seek(0)
             f.truncate()
             f.write(file_new_bytes)
+            f.close()
+            return start_section_bytes
 
-        return export_section_bytes
-
-    def change_start_section(self, export_vec: list, file_path):
-        export_vec_len = len(export_vec)
-        export_vec_len_bytes = LEB128U.encode(export_vec_len)
-        export_vec_bytes = bytes()
-        export_vec_bytes += export_vec_len_bytes
-        if export_vec == []:
-            return
-        for export_item in export_vec:
-            export_vec_bytes += LEB128U.encode(len(export_item.name))
-            export_vec_bytes += bytes(export_item.name, encoding="utf-8")
-            export_vec_bytes += LEB128U.encode(export_item.desc.tag)
-            export_vec_bytes += LEB128U.encode(export_item.desc.idx)
-
-        export_section_bytes = bytes([0x07]) + LEB128U.encode(len(export_vec_bytes)) + export_vec_bytes
-
-        with open(os.path.abspath(file_path), "rb+") as f:
-            file_bytes = f.read()
-            file_new_bytes = file_bytes[
-                             :self.module.section_range[SecExportID].start] + export_section_bytes + file_bytes[
-                                                                                                     self.module.section_range[
-                                                                                                         SecExportID].end:]
-            change = len(export_section_bytes) - (
-                    self.module.section_range[SecExportID].end - self.module.section_range[SecExportID].start)
-
-            self.module.section_range[SecExportID].end = self.module.section_range[SecExportID].start + len(
-                export_section_bytes)
-            self.fix_section_range(SecExportID, change, self.module.section_range[SecExportID].start)
-            f.seek(0)
-            f.truncate()
-            f.write(file_new_bytes)
-
-        return export_section_bytes
-
-    def change_memory_section(self, memory_vec: list, file_path):
+    def modify_memory_section(self, memory_vec: list, file_path):
         memory_vec_len = len(memory_vec)
         memory_vec_len_bytes = LEB128U.encode(memory_vec_len)
         memory_vec_bytes = bytes()
@@ -632,25 +646,28 @@ class ModifyBinary:
 
         memroy_section_bytes = bytes([SecMemID]) + LEB128U.encode(len(memory_vec_bytes)) + memory_vec_bytes
 
-        with open(os.path.abspath(file_path), "rb+") as f:
-            file_bytes = f.read()
-            file_new_bytes = file_bytes[
-                             :self.module.section_range[SecMemID].start] + memroy_section_bytes + file_bytes[
-                                                                                                  self.module.section_range[
-                                                                                                      SecMemID].end:]
-            change = len(memroy_section_bytes) - (
-                    self.module.section_range[SecMemID].end - self.module.section_range[SecMemID].start)
+        if os.path.isfile(file_path):
+            f = open(file_path, "r+b")
+        else:
+            f = open(file_path, "w+b")
+        file_bytes = f.read()
+        file_new_bytes = file_bytes[
+                         :self.module.section_range[SecMemID].start] + memroy_section_bytes + file_bytes[
+                                                                                              self.module.section_range[
+                                                                                                  SecMemID].end:]
+        change = len(memroy_section_bytes) - (
+                self.module.section_range[SecMemID].end - self.module.section_range[SecMemID].start)
 
-            self.module.section_range[SecMemID].end = self.module.section_range[SecMemID].start + len(
-                memroy_section_bytes)
-            self.fix_section_range(SecMemID, change, self.module.section_range[SecMemID].start)
-            f.seek(0)
-            f.truncate()
-            f.write(file_new_bytes)
-
+        self.module.section_range[SecMemID].end = self.module.section_range[SecMemID].start + len(
+            memroy_section_bytes)
+        self.fix_section_range(SecMemID, change, self.module.section_range[SecMemID].start)
+        f.seek(0)
+        f.truncate()
+        f.write(file_new_bytes)
+        f.close()
         return memroy_section_bytes
 
-    def change_data_section(self, data_vec: list, file_path):
+    def modify_data_section(self, data_vec: list, file_path):
         data_vec_len = len(data_vec)
         data_vec_len_bytes = LEB128U.encode(data_vec_len)
         data_vec_bytes = bytes()
@@ -668,25 +685,28 @@ class ModifyBinary:
 
         data_section_bytes = bytes([SecDataID]) + LEB128U.encode(len(data_vec_bytes)) + data_vec_bytes
 
-        with open(os.path.abspath(file_path), "rb+") as f:
-            file_bytes = f.read()
-            file_new_bytes = file_bytes[
-                             :self.module.section_range[SecDataID].start] + data_section_bytes + file_bytes[
-                                                                                                 self.module.section_range[
-                                                                                                     SecDataID].end:]
-            change = len(data_section_bytes) - (
-                    self.module.section_range[SecDataID].end - self.module.section_range[SecDataID].start)
+        if os.path.isfile(file_path):
+            f = open(file_path, "r+b")
+        else:
+            f = open(file_path, "w+b")
+        file_bytes = f.read()
+        file_new_bytes = file_bytes[
+                         :self.module.section_range[SecDataID].start] + data_section_bytes + file_bytes[
+                                                                                             self.module.section_range[
+                                                                                                 SecDataID].end:]
+        change = len(data_section_bytes) - (
+                self.module.section_range[SecDataID].end - self.module.section_range[SecDataID].start)
 
-            self.module.section_range[SecDataID].end = self.module.section_range[SecDataID].start + len(
-                data_section_bytes)
-            self.fix_section_range(SecDataID, change, self.module.section_range[SecDataID].start)
-            f.seek(0)
-            f.truncate()
-            f.write(file_new_bytes)
-
+        self.module.section_range[SecDataID].end = self.module.section_range[SecDataID].start + len(
+            data_section_bytes)
+        self.fix_section_range(SecDataID, change, self.module.section_range[SecDataID].start)
+        f.seek(0)
+        f.truncate()
+        f.write(file_new_bytes)
+        f.close()
         return data_section_bytes
 
-    def change_elem_section(self, elem_vec: list, file_path):
+    def modify_elem_section(self, elem_vec: list, file_path):
 
         elem_vec_len = len(elem_vec)
         elem_vec_len_bytes = LEB128U.encode(elem_vec_len)
@@ -702,45 +722,48 @@ class ModifyBinary:
                 elem_vec_bytes += LEB128U.encode(func_idx)
         elem_section_bytes = bytes([SecElemID]) + LEB128U.encode(len(elem_vec_bytes)) + elem_vec_bytes
 
-        with open(os.path.abspath(file_path), "rb+") as f:
-            file_bytes = f.read()
-            binary_start = self.module.section_range[SecElemID].start
-            binary_end = self.module.section_range[SecElemID].end
-            if binary_start == binary_end:
-                for i in reversed(range(SecElemID)):
-                    if self.module.section_range[i].start != self.module.section_range[i].end:
-                        file_new_bytes = file_bytes[
-                                         :self.module.section_range[i].end] + elem_section_bytes + file_bytes[
-                                                                                                   self.module.section_range[
-                                                                                                       i].end:]
-                        change = len(elem_section_bytes) - (
-                                self.module.section_range[SecElemID].end - self.module.section_range[SecElemID].start)
-                        self.module.section_range[SecElemID].start = self.module.section_range[i].end
-                        self.module.section_range[SecElemID].end = self.module.section_range[i].end + len(
-                            elem_section_bytes)
-                        self.fix_section_range(SecElemID, change, self.module.section_range[SecElemID].start)
-                        f.seek(0)
-                        f.truncate()
-                        f.write(file_new_bytes)
-                        break
-            else:
-                file_new_bytes = file_bytes[
-                                 :self.module.section_range[SecElemID].start] + elem_section_bytes + file_bytes[
-                                                                                                     self.module.section_range[
-                                                                                                         SecElemID].end:]
-                change = len(elem_section_bytes) - (
-                        self.module.section_range[SecElemID].end - self.module.section_range[SecElemID].start)
+        if os.path.isfile(file_path):
+            f = open(file_path, "r+b")
+        else:
+            f = open(file_path, "w+b")
+        file_bytes = f.read()
+        binary_start = self.module.section_range[SecElemID].start
+        binary_end = self.module.section_range[SecElemID].end
+        if binary_start == binary_end:
+            for i in reversed(range(SecElemID)):
+                if self.module.section_range[i].start != self.module.section_range[i].end:
+                    file_new_bytes = file_bytes[
+                                     :self.module.section_range[i].end] + elem_section_bytes + file_bytes[
+                                                                                               self.module.section_range[
+                                                                                                   i].end:]
+                    change = len(elem_section_bytes) - (
+                            self.module.section_range[SecElemID].end - self.module.section_range[SecElemID].start)
+                    self.module.section_range[SecElemID].start = self.module.section_range[i].end
+                    self.module.section_range[SecElemID].end = self.module.section_range[i].end + len(
+                        elem_section_bytes)
+                    self.fix_section_range(SecElemID, change, self.module.section_range[SecElemID].start)
+                    f.seek(0)
+                    f.truncate()
+                    f.write(file_new_bytes)
+                    break
+        else:
+            file_new_bytes = file_bytes[
+                             :self.module.section_range[SecElemID].start] + elem_section_bytes + file_bytes[
+                                                                                                 self.module.section_range[
+                                                                                                     SecElemID].end:]
+            change = len(elem_section_bytes) - (
+                    self.module.section_range[SecElemID].end - self.module.section_range[SecElemID].start)
 
-                self.module.section_range[SecElemID].end = self.module.section_range[SecElemID].start + len(
-                    elem_section_bytes)
-                self.fix_section_range(SecElemID, change, self.module.section_range[SecElemID].start)
-                f.seek(0)
-                f.truncate()
-                f.write(file_new_bytes)
-
+            self.module.section_range[SecElemID].end = self.module.section_range[SecElemID].start + len(
+                elem_section_bytes)
+            self.fix_section_range(SecElemID, change, self.module.section_range[SecElemID].start)
+            f.seek(0)
+            f.truncate()
+            f.write(file_new_bytes)
+        f.close()
         return elem_section_bytes
 
-    def change_type_section(self, functype_vec: list, file_path):
+    def modify_type_section(self, functype_vec: list, file_path):
 
         functype_vec_len = len(functype_vec)
         functype_vec_len_bytes = LEB128U.encode(functype_vec_len)
@@ -756,24 +779,29 @@ class ModifyBinary:
             functype_vec_bytes += functype_bytes
         type_section_bytes = bytes([0x01]) + LEB128U.encode(len(functype_vec_bytes)) + functype_vec_bytes
 
-        with open(os.path.abspath(file_path), "rb+") as f:
-            file_bytes = f.read()
-            file_new_bytes = file_bytes[:self.module.section_range[SecTypeID].start] + type_section_bytes + file_bytes[
-                                                                                                            self.module.section_range[
-                                                                                                                SecTypeID].end:]
-            change = len(type_section_bytes) - (
-                    self.module.section_range[SecTypeID].end - self.module.section_range[SecTypeID].start)
+        if os.path.isfile(file_path):
+            f = open(file_path, "r+b")
+        else:
+            f = open(file_path, "w+b")
 
-            self.module.section_range[SecTypeID].end = self.module.section_range[SecTypeID].start + len(
-                type_section_bytes)
-            self.fix_section_range(SecTypeID, change, self.module.section_range[SecTypeID].start)
-            f.seek(0)
-            f.truncate()
-            f.write(file_new_bytes)
 
+        file_bytes = f.read()
+        file_new_bytes = file_bytes[:self.module.section_range[SecTypeID].start] + type_section_bytes + file_bytes[
+                                                                                                        self.module.section_range[
+                                                                                                            SecTypeID].end:]
+        change = len(type_section_bytes) - (
+                self.module.section_range[SecTypeID].end - self.module.section_range[SecTypeID].start)
+
+        self.module.section_range[SecTypeID].end = self.module.section_range[SecTypeID].start + len(
+            type_section_bytes)
+        self.fix_section_range(SecTypeID, change, self.module.section_range[SecTypeID].start)
+        f.seek(0)
+        f.truncate()
+        f.write(file_new_bytes)
+        f.close()
         return type_section_bytes
 
-    def change_global_section(self, global_vec: list, file_path):
+    def modify_global_section(self, global_vec: list, file_path):
 
         global_vec_len = len(global_vec)
         global_vec_len_bytes = LEB128U.encode(global_vec_len)
@@ -788,30 +816,33 @@ class ModifyBinary:
 
         global_section_bytes = bytes([0x06]) + LEB128U.encode(len(global_vec_bytes)) + global_vec_bytes
 
-        with open(os.path.abspath(file_path), "rb+") as f:
-            file_bytes = f.read()
-            if self.module.section_range[SecGlobalID].start == 0:
-                for section in range(1, SecGlobalID):
-                    if self.module.section_range[section].start != 0:
-                        self.module.section_range[SecGlobalID].start = self.module.section_range[section].end
-                        self.module.section_range[SecGlobalID].end = self.module.section_range[SecGlobalID].start
-            file_new_bytes = file_bytes[
-                             :self.module.section_range[SecGlobalID].start] + global_section_bytes + file_bytes[
-                                                                                                     self.module.section_range[
-                                                                                                         SecGlobalID].end:]
-            change = len(global_section_bytes) - (
-                    self.module.section_range[SecGlobalID].end - self.module.section_range[SecGlobalID].start)
+        if os.path.isfile(file_path):
+            f = open(file_path, "r+b")
+        else:
+            f = open(file_path, "w+b")
+        file_bytes = f.read()
+        if self.module.section_range[SecGlobalID].start == 0:
+            for section in range(1, SecGlobalID):
+                if self.module.section_range[section].start != 0:
+                    self.module.section_range[SecGlobalID].start = self.module.section_range[section].end
+                    self.module.section_range[SecGlobalID].end = self.module.section_range[SecGlobalID].start
+        file_new_bytes = file_bytes[
+                         :self.module.section_range[SecGlobalID].start] + global_section_bytes + file_bytes[
+                                                                                                 self.module.section_range[
+                                                                                                     SecGlobalID].end:]
+        change = len(global_section_bytes) - (
+                self.module.section_range[SecGlobalID].end - self.module.section_range[SecGlobalID].start)
 
-            self.module.section_range[SecGlobalID].end = self.module.section_range[SecGlobalID].start + len(
-                global_section_bytes)
-            self.fix_section_range(SecGlobalID, change, self.module.section_range[SecGlobalID].start)
-            f.seek(0)
-            f.truncate()
-            f.write(file_new_bytes)
-
+        self.module.section_range[SecGlobalID].end = self.module.section_range[SecGlobalID].start + len(
+            global_section_bytes)
+        self.fix_section_range(SecGlobalID, change, self.module.section_range[SecGlobalID].start)
+        f.seek(0)
+        f.truncate()
+        f.write(file_new_bytes)
+        f.close()
         return global_section_bytes
 
-    def change_func_section(self, type_vec, file_path):
+    def modify_func_section(self, type_vec, file_path):
 
         type_vec_len = len(type_vec)
         type_vec_len_bytes = LEB128U.encode(type_vec_len)
@@ -823,22 +854,27 @@ class ModifyBinary:
             type_vec_bytes += LEB128U.encode(type_item)
 
         func_section_bytes = bytes([0x03]) + LEB128U.encode(len(type_vec_bytes)) + type_vec_bytes
-        with open(os.path.abspath(file_path), "rb+") as f:
-            file_bytes = f.read()
-            file_new_bytes = file_bytes[:self.module.section_range[SecFuncID].start] + func_section_bytes + file_bytes[
-                                                                                                            self.module.section_range[
-                                                                                                                SecFuncID].end:]
-            change = len(func_section_bytes) - (
-                    self.module.section_range[SecFuncID].end - self.module.section_range[SecFuncID].start)
+        if os.path.isfile(file_path):
+            f = open(file_path, "r+b")
+        else:
+            f = open(file_path, "w+b")
+        file_bytes = f.read()
+        file_new_bytes = file_bytes[:self.module.section_range[SecFuncID].start] + func_section_bytes + file_bytes[
+                                                                                                        self.module.section_range[
+                                                                                                            SecFuncID].end:]
+        change = len(func_section_bytes) - (
+                self.module.section_range[SecFuncID].end - self.module.section_range[SecFuncID].start)
 
-            self.module.section_range[SecFuncID].end = self.module.section_range[SecFuncID].start + len(
-                func_section_bytes)
-            self.fix_section_range(SecFuncID, change, self.module.section_range[SecFuncID].start)
-            f.seek(0)
-            f.truncate()
-            f.write(file_new_bytes)
+        self.module.section_range[SecFuncID].end = self.module.section_range[SecFuncID].start + len(
+            func_section_bytes)
+        self.fix_section_range(SecFuncID, change, self.module.section_range[SecFuncID].start)
+        f.seek(0)
+        f.truncate()
+        f.write(file_new_bytes)
+        f.close()
+        return func_section_bytes
 
-    def change_code_section(self, code_vec: list, file_path):
+    def modify_code_section(self, code_vec: list, file_path):
 
         code_vec_len = len(code_vec)
         code_vec_len_bytes = LEB128U.encode(code_vec_len)
@@ -864,24 +900,27 @@ class ModifyBinary:
             code_vec_bytes += LEB128U.encode(len(code_bytes)) + code_bytes
         code_section_bytes = bytes([0x0A]) + LEB128U.encode(len(code_vec_bytes)) + code_vec_bytes
 
-        with open(os.path.abspath(file_path), "rb+") as f:
-            file_bytes = f.read()
-            file_new_bytes = file_bytes[:self.module.section_range[SecCodeID].start] + code_section_bytes + file_bytes[
-                                                                                                            self.module.section_range[
-                                                                                                                SecCodeID].end:]
-            change = len(code_section_bytes) - (
-                    self.module.section_range[SecCodeID].end - self.module.section_range[SecCodeID].start)
+        if os.path.isfile(file_path):
+            f = open(file_path, "r+b")
+        else:
+            f = open(file_path, "w+b")
+        file_bytes = f.read()
+        file_new_bytes = file_bytes[:self.module.section_range[SecCodeID].start] + code_section_bytes + file_bytes[
+                                                                                                        self.module.section_range[
+                                                                                                            SecCodeID].end:]
+        change = len(code_section_bytes) - (
+                self.module.section_range[SecCodeID].end - self.module.section_range[SecCodeID].start)
 
-            self.module.section_range[SecCodeID].end = self.module.section_range[SecCodeID].start + len(
-                code_section_bytes)
-            self.fix_section_range(SecCodeID, change, self.module.section_range[SecCodeID].start)
-            f.seek(0)
-            f.truncate()
-            f.write(file_new_bytes)
-
+        self.module.section_range[SecCodeID].end = self.module.section_range[SecCodeID].start + len(
+            code_section_bytes)
+        self.fix_section_range(SecCodeID, change, self.module.section_range[SecCodeID].start)
+        f.seek(0)
+        f.truncate()
+        f.write(file_new_bytes)
+        f.close()
         return code_section_bytes
 
-    def change_table_section(self, table_vec: list, file_path):
+    def modify_table_section(self, table_vec: list, file_path):
 
         table_vec_len = len(table_vec)
         table_vec_len_bytes = LEB128U.encode(table_vec_len)
@@ -900,42 +939,46 @@ class ModifyBinary:
 
         table_section_bytes = bytes([0x04]) + LEB128U.encode(len(table_vec_bytes)) + table_vec_bytes
 
-        with open(os.path.abspath(file_path), "rb+") as f:
-            file_bytes = f.read()
-            binary_start = self.module.section_range[SecTableID].start
-            binary_end = self.module.section_range[SecTableID].end
-            if binary_start == binary_end:
-                for i in reversed(range(SecTableID)):
-                    if self.module.section_range[i].start != self.module.section_range[i].end:
-                        file_new_bytes = file_bytes[
-                                         :self.module.section_range[i].end] + table_section_bytes + file_bytes[
-                                                                                                    self.module.section_range[
-                                                                                                        i].end:]
-                        change = len(table_section_bytes) - (
-                                self.module.section_range[SecTableID].end - self.module.section_range[
-                            SecTableID].start)
-                        self.module.section_range[SecTableID].start = self.module.section_range[i].end
-                        self.module.section_range[SecTableID].end = self.module.section_range[i].end + len(
-                            table_section_bytes)
-                        self.fix_section_range(SecTableID, change, self.module.section_range[SecTableID].start)
-                        f.seek(0)
-                        f.truncate()
-                        f.write(file_new_bytes)
-                        break
-            else:
-                file_new_bytes = file_bytes[
-                                 :self.module.section_range[SecTableID].start] + table_section_bytes + file_bytes[
-                                                                                                       self.module.section_range[
-                                                                                                           SecTableID].end:]
-                change = len(table_section_bytes) - (
-                        self.module.section_range[SecTableID].end - self.module.section_range[SecTableID].start)
+        if os.path.isfile(file_path):
+            f = open(file_path, "r+b")
+        else:
+            f = open(file_path, "w+b")
+        file_bytes = f.read()
+        binary_start = self.module.section_range[SecTableID].start
+        binary_end = self.module.section_range[SecTableID].end
+        if binary_start == binary_end:
+            for i in reversed(range(SecTableID)):
+                if self.module.section_range[i].start != self.module.section_range[i].end:
+                    file_new_bytes = file_bytes[
+                                     :self.module.section_range[i].end] + table_section_bytes + file_bytes[
+                                                                                                self.module.section_range[
+                                                                                                    i].end:]
+                    change = len(table_section_bytes) - (
+                            self.module.section_range[SecTableID].end - self.module.section_range[
+                        SecTableID].start)
+                    self.module.section_range[SecTableID].start = self.module.section_range[i].end
+                    self.module.section_range[SecTableID].end = self.module.section_range[i].end + len(
+                        table_section_bytes)
+                    self.fix_section_range(SecTableID, change, self.module.section_range[SecTableID].start)
+                    f.seek(0)
+                    f.truncate()
+                    f.write(file_new_bytes)
+                    break
+        else:
+            file_new_bytes = file_bytes[
+                             :self.module.section_range[SecTableID].start] + table_section_bytes + file_bytes[
+                                                                                                   self.module.section_range[
+                                                                                                       SecTableID].end:]
+            change = len(table_section_bytes) - (
+                    self.module.section_range[SecTableID].end - self.module.section_range[SecTableID].start)
 
-                self.module.section_range[SecTableID].end = self.module.section_range[SecTableID].start + len(
-                    table_section_bytes)
-                self.fix_section_range(SecTableID, change, self.module.section_range[SecTableID].start)
-                f.seek(0)
-                f.truncate()
-                f.write(file_new_bytes)
+            self.module.section_range[SecTableID].end = self.module.section_range[SecTableID].start + len(
+                table_section_bytes)
+            self.fix_section_range(SecTableID, change, self.module.section_range[SecTableID].start)
+            f.seek(0)
+            f.truncate()
+            f.write(file_new_bytes)
+        f.close()
 
         return table_section_bytes
 

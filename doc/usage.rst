@@ -26,7 +26,7 @@ The basic operation of the section rewriter is ``select``, ``insert``, ``update`
     binary = BREWasm('a.wasm') # Open a Wasm binary file
 
     # Initialize a section rewriter of the global section. 
-    global_rewriter = SectionRewriter(self.binary.module, self.binary.module.global_sec)
+    global_rewriter = SectionRewriter(binary.module, binary.module.global_sec)
 
     # Select all the items in global section
     global_list = global_rewriter.select()
