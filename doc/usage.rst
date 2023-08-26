@@ -43,7 +43,7 @@ The basic operation of the section rewriter is ``select``, ``insert``, ``update`
 Semantics Rewriter
 -----------------
 
-Example using concrete bytecode to execute ``print('Hello World!')``::
+Insert a internal function in the binary
 
     from BREWasm import *
 
