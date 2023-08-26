@@ -22,14 +22,13 @@ The basic operation of the section rewriter is ``select``, ``insert``, ``update`
 
     from BREWasm import *
 
-
-    binary = BREWasm('a.wasm') # Open a Wasm binary file
+    binary = BREWasm('a.wasm')  # Open a Wasm binary file
 
     # Initialize a section rewriter of the global section. 
-    global_rewriter = SectionRewriter(binary.module, binary.module.global_sec)
+    global_rewriter = SectionRewriter(binary.module, globalsec=binary.module.global_sec)
 
     # Select all the items in global section
-    global_list = global_rewriter.select()
+    global_list = global_rewriter.select(Global())
     # Get the attribute globalidx of a global item, whose index is one.
     idx = global_list[1].globalidx
     # Insert a new global item at the index idx of the global section
@@ -48,15 +47,14 @@ Example using concrete bytecode to execute ``print('Hello World!')``::
 
     from BREWasm import *
 
-
     binary = BREWasm('a.wasm') # Open a Wasm binary file
 
     # Initialize a semantics rewriter of the function semantics
-    function_rewriter = SemanticRewriter.Function(binary)
+    function_rewriter = SemanticsRewriter.Function(binary.module)
     # Define the instructions of function
-    funcbody = [Instruction(LocalGet, 0), Instruction(LocalGet, 1), Instruction(I32Add, 0), Instruction(Nop)]
+    func_body = [Instruction(LocalGet, 0), Instruction(LocalGet, 1), Instruction(I32Add, 0), Instruction(Nop)]
     # Insert a internal function in the binary
-    function_rewriter.insert_internal_function(idx=1, params_type=[I32, I32], results_type=[I32], local_vec=[Local(0, I32), Local(1, I64)], funcbody)
+    function_rewriter.insert_internal_function(idx=1, params_type=[I32, I32], results_type=[I32], local_vec=[Local(0, I32), Local(1, I64)], func_body=func_body)
     # Emit a new binary file
     binary.emit_binary('b.wasm')
 
