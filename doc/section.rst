@@ -72,7 +72,7 @@ SectionRewriter
       Insert a element in the section by condition *query*.
 
       :param query: The query to the location of the element to be inserted.
-      :type query: Query are represented by the element in each section, such as ``Global(globalidx=1)``. It can not be passed by None.
+      :type query: Query are represented by the element in each section, such as ``Global(globalidx=1)``. If you passed ``None``, it equals to append operation, which means a new item will be appended at end of the section.
 
       :param inserted_item: The element to be inserted.
       :type inserted_item: There is no need to specify the index of the inserted element because it has already been identified by the param *query*.
