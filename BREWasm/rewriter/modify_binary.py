@@ -1029,18 +1029,34 @@ class ModifyBinary:
         elif opcode in [MemorySize, MemoryGrow]:
             return bytes([0x00])
         elif opcode == I32Const:
-            return LEB128S.encode(instr.args)
+            return LEB128S.encode(instr.args)  # u32
         elif opcode == I64Const:
-            return LEB128S.encode(instr.args)
+            return LEB128S.encode(instr.args)  # u64
         elif opcode == F32Const:
             return struct.pack('<f', instr.args)
         elif opcode == F64Const:
             return struct.pack('<d', instr.args)
-        elif opcode == TruncSat:
+        elif opcode == V128Const:
+            return instr.args.to_bytes(16, 'little')  # v128
+        elif opcode == I8x16Shuffle:
+            return instr.args.to_bytes(16, 'little')  # v128
+        elif I8x16ExtractLaneS <= opcode <= F64x2ReplaceLane:
             return bytes([instr.args])
+        elif opcode in [RefNull, RefFunc]:
+            return LEB128U.encode(instr.args)
+        elif opcode in [MemoryInit, DataDrop, ElemDrop, TableGrow, TableSize, TableFill]:
+            return LEB128U.encode(instr.args)
+        elif opcode in [TableInit, TableCopy]:
+            x = LEB128U.encode(instr.args.x)
+            y = LEB128U.encode(instr.args.y)
+            return x + y
+        elif V128Load <= opcode <= V128Store or opcode in [V128Load32Zero, V128Load64Zero]:
+            return self.write_mem_arg(instr)
+        elif V128Load8Lane <= opcode <= V128Store64Lane:
+            return self.write_mem_lane_arg(instr)
+        elif I32Load <= instr.opcode <= I64Store32:
+            return self.write_mem_arg(instr)
         else:
-            if I32Load <= instr.opcode <= I64Store32:
-                return self.write_mem_arg(instr)
             return None
 
     def write_block_args(self, instr):

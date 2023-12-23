@@ -1,17 +1,18 @@
 import ctypes
 import struct
 
-from ..parser.instruction import Instruction, BlockArgs, IfArgs, BrTableArgs, MemArg
-from ..parser.leb128 import *
+from ..parser.instruction import Instruction, BlockArgs, IfArgs, BrTableArgs, MemArg, TableArg, MemLaneArg
 from ..parser.module import Import, ImportDesc, ImportTagFunc, ImportTagTable, ImportTagMem, ImportTagGlobal, \
     Global, Export, ExportDesc, ExportTagFunc, ExportTagTable, ExportTagMem, ExportTagGlobal, Elem, Code, Locals, \
     Data, MagicNumber, Version, Module, SecCustomID, SecDataID, CustomSec, SecTypeID, SecImportID, SecFuncID, \
     SecTableID, SecMemID, SecGlobalID, SecExportID, SecStartID, SecElemID, SecCodeID, NameData, SectionRange
 from ..parser.opcodes import *
 from ..parser.opnames import opnames
-from ..parser.types import I32, I64, F32, F64, FuncType, FtTag, TableType, FuncRef, \
+from ..parser.types import ValTypeI32, ValTypeI64, ValTypeF32, ValTypeF64, ValTypeV128, FuncType, FtTag, TableType, \
+    FuncRef, \
     GlobalType, MutConst, MutVar, Limits, BlockTypeI32, BlockTypeI64, BlockTypeF32, BlockTypeF64, BlockTypeEmpty, \
-    NameAssoc
+    NameAssoc, BlockTypeV128
+from ..parser.leb128 import *
 
 
 def decode_file(file_name: str):
@@ -46,14 +47,12 @@ def decode(data, f):
 class WasmReader:
 
     def __init__(self, data=None, reader=None):
-
         if data is None:
             data = []
         self.reader = reader
         self.data = data
 
     def remaining(self):
-
         return len(self.data) - self.reader.tell()
 
     def read_byte(self):
@@ -84,26 +83,37 @@ class WasmReader:
         b = int.from_bytes(self.reader.read(8), byteorder='little')
         return struct.unpack('>d', struct.pack('>Q', b))[0]
 
+    def read_v128(self):
+
+        if self.remaining() < 16:
+            raise ErrUnexpectedEnd
+        b = int.from_bytes(self.reader.read(16), byteorder='little')
+        return b
+
+    def read_lane(self):
+
+        if self.remaining() < 1:
+            raise ErrUnexpectedEnd
+        b = int.from_bytes(self.reader.read(1), byteorder='little')
+        return ctypes.c_int32(b).value
+
     def read_var_u32(self):
 
         n, w = decode_var_uint(self.reader, 32)
-
         return n
 
     def read_var_s32(self):
 
         n, w = decode_var_int(self.reader, 32)
-
         return n
 
     def read_var_s64(self):
 
         n, w = decode_var_int(self.reader, 64)
-
         return n
 
     def read_bytes(self):
-
+     
         n = self.read_var_u32()
         if self.remaining() < int(n):
             raise ErrUnexpectedEnd
@@ -111,7 +121,6 @@ class WasmReader:
         return bytearray(bytes_data)
 
     def read_name(self):
-
         data = self.read_bytes()
         try:
             data.decode('utf-8')
@@ -123,17 +132,14 @@ class WasmReader:
     def read_module(self, module: Module):
         if self.remaining() < 4:
             raise Exception("unexpected end of magic header")
-
         module.magic = self.read_u32()
         if module.magic != MagicNumber:
             raise Exception("magic header not detected")
         if self.remaining() < 4:
-            raise Exception("unexpected end of BREWasm version")
-
+            raise Exception("unexpected end of chaos version")
         module.version = self.read_u32()
         if module.version != Version:
-            raise Exception("unknown BREWasm version: %d" % module.version)
-
+            raise Exception("unknown chaos version: %d" % module.version)
         self.read_sections(module)
         if len(module.func_sec) != len(module.code_sec):
             raise Exception("function and code section have inconsistent lengths")
@@ -145,35 +151,30 @@ class WasmReader:
         prev_sec_id = 0
         while self.remaining() > 0:
             sec_id = self.read_byte()
-
             if sec_id == SecCustomID:
+                #     module.custom_secs = []
                 n, w = decode_var_uint(self.reader, 32)
-
+                from leb128 import LEB128U
                 start = self.reader.tell() - w - 1
                 end = self.reader.tell() + n
                 custom_sec, custom_sec_name = self.read_custom_sec(n)
                 module.section_range[SecCustomID].append(SectionRange(start, end, custom_sec_name))
                 module.custom_secs.append(custom_sec)
                 continue
-
             if sec_id > SecDataID:
                 raise Exception("malformed section id: %d" % sec_id)
-
             if sec_id <= prev_sec_id:
                 raise Exception("junk after last section, id: %d" % sec_id)
             prev_sec_id = sec_id
-
             n, w = decode_var_uint(self.reader, 32)
             remaining_before_read = self.remaining()
             self.read_non_custom_sec(sec_id, module, n, w)
-
             remain = self.remaining()
             if remain + int(n) != remaining_before_read:
                 raise Exception("section size mismatch, id: %d" % sec_id)
 
     def read_custom_sec(self, sec_size):
         name = self.read_name()
-
         if name != "name":
             self.reader.seek(self.reader.tell() - len(name) - 1)
             custom_sec_data = self.reader.read(sec_size)
@@ -184,19 +185,6 @@ class WasmReader:
 
     @staticmethod
     def read_name_data(data):
-        """
-        namedata: modulenamesubsec?|funcnamesubsec?|localnamesubsec?
-        custom_sec: 0x00|byte_count|name|namedata
-        namedata: modulenamesubsec?|funcnamesubsec?|localnamesubsec?
-        modulenamesubsec: 0x00|byte_count|modulename
-        funcnamesubsec: 0x01|byte_count|namemap
-        namemap: vec<nameassoc>
-        nameassoc: idx|name
-        localnamesubsec: 0x02|byte_count|indirectnamemap
-        indirectnamemap: vec<indirectnameassoc>
-        indirectnameassoc: idx|namemap
-        :return:
-        """
         funcname_map = []
         globalname_map = []
         dataname_map = []
@@ -239,13 +227,13 @@ class WasmReader:
                 local_bytes = data[:namesubsec_size]
                 data = data[namesubsec_size:]
 
-            if sub_sec_id[0] == 3:
+            if sub_sec_id[0] == 3:  # TODO
                 namesubsec_size, w = decode_var_uint_from_data(data, 32)
                 data = data[w:]
                 labels_bytes = data[:namesubsec_size]
                 data = data[namesubsec_size:]
 
-            if sub_sec_id[0] == 4:
+            if sub_sec_id[0] == 4:  # TODO
                 namesubsec_size, w = decode_var_uint_from_data(data, 32)
                 data = data[w:]
                 type_bytes = data[:namesubsec_size]
@@ -267,7 +255,7 @@ class WasmReader:
                     data = data[name_size:]
                     name_assoc = NameAssoc(idx=idx, name=name)
                     tablename_map.append(name_assoc)
-            if sub_sec_id[0] == 6:
+            if sub_sec_id[0] == 6:  # TODO
                 namesubsec_size, w = decode_var_uint_from_data(data, 32)
                 data = data[w:]
                 memory_bytes = data[:namesubsec_size]
@@ -289,7 +277,7 @@ class WasmReader:
                     data = data[name_size:]
                     name_assoc = NameAssoc(idx=idx, name=name)
                     globalname_map.append(name_assoc)
-            if sub_sec_id[0] == 8:
+            if sub_sec_id[0] == 8:  # TODO
                 namesubsec_size, w = decode_var_uint_from_data(data, 32)
                 data = data[w:]
                 elem_bytes = data[:namesubsec_size]
@@ -317,101 +305,80 @@ class WasmReader:
         return name_data
 
     def read_non_custom_sec(self, sec_id, module, sec_size, byte_count_size):
-        """
-        :param byte_count_size:
-        :param sec_size:
-        :param sec_id: 段ID
-        :param module:
-        :return:
-        """
         if sec_id == SecTypeID:
-
             module.section_range[SecTypeID].start = self.reader.tell() - byte_count_size - 1
             module.section_range[SecTypeID].end = self.reader.tell() + sec_size
             print("type start=" + str(module.section_range[SecTypeID].start))
             print("type end=" + str(module.section_range[SecTypeID].end))
-
             module.type_sec = self.read_type_sec()
         elif sec_id == SecImportID:
             module.section_range[SecImportID].start = self.reader.tell() - byte_count_size - 1
             module.section_range[SecImportID].end = self.reader.tell() + sec_size
             print("import start=" + str(module.section_range[SecImportID].start))
             print("import end=" + str(module.section_range[SecImportID].end))
-
             module.import_sec = self.read_import_sec()
         elif sec_id == SecFuncID:
             module.section_range[SecFuncID].start = self.reader.tell() - byte_count_size - 1
             module.section_range[SecFuncID].end = self.reader.tell() + sec_size
             print("func start=" + str(module.section_range[SecFuncID].start))
             print("func end=" + str(module.section_range[SecFuncID].end))
-
             module.func_sec = self.read_indices()
         elif sec_id == SecTableID:
             module.section_range[SecTableID].start = self.reader.tell() - byte_count_size - 1
             module.section_range[SecTableID].end = self.reader.tell() + sec_size
             print("table start=" + str(module.section_range[SecTableID].start))
             print("table end=" + str(module.section_range[SecTableID].end))
-
             module.table_sec = self.read_table_sec()
         elif sec_id == SecMemID:
             module.section_range[SecMemID].start = self.reader.tell() - byte_count_size - 1
             module.section_range[SecMemID].end = self.reader.tell() + sec_size
             print("mem start=" + str(module.section_range[SecMemID].start))
             print("mem end=" + str(module.section_range[SecMemID].end))
-
             module.mem_sec = self.read_mem_sec()
         elif sec_id == SecGlobalID:
             module.section_range[SecGlobalID].start = self.reader.tell() - byte_count_size - 1
             module.section_range[SecGlobalID].end = self.reader.tell() + sec_size
             print("global start=" + str(module.section_range[SecGlobalID].start))
             print("global end=" + str(module.section_range[SecGlobalID].end))
-
             module.global_sec = self.read_global_sec()
         elif sec_id == SecExportID:
             module.section_range[SecExportID].start = self.reader.tell() - byte_count_size - 1
             module.section_range[SecExportID].end = self.reader.tell() + sec_size
             print("export start=" + str(module.section_range[SecExportID].start))
             print("export end=" + str(module.section_range[SecExportID].end))
-
             module.export_sec = self.read_export_sec()
         elif sec_id == SecStartID:
             module.section_range[SecStartID].start = self.reader.tell() - byte_count_size - 1
             module.section_range[SecStartID].end = self.reader.tell() + sec_size
             print("start start=" + str(module.section_range[SecStartID].start))
             print("start end=" + str(module.section_range[SecStartID].end))
-
             module.start_sec = self.read_start_sec()
         elif sec_id == SecElemID:
             module.section_range[SecElemID].start = self.reader.tell() - byte_count_size - 1
             module.section_range[SecElemID].end = self.reader.tell() + sec_size
             print("elem start=" + str(module.section_range[SecElemID].start))
             print("elem end=" + str(module.section_range[SecElemID].end))
-
             module.elem_sec = self.read_elem_sec()
         elif sec_id == SecCodeID:
             module.section_range[SecCodeID].start = self.reader.tell() - byte_count_size - 1
             module.section_range[SecCodeID].end = self.reader.tell() + sec_size
             print("code start=" + str(module.section_range[SecCodeID].start))
             print("code end=" + str(module.section_range[SecCodeID].end))
-
             module.code_sec = self.read_code_sec()
         elif sec_id == SecDataID:
             module.section_range[SecDataID].start = self.reader.tell() - byte_count_size - 1
             module.section_range[SecDataID].end = self.reader.tell() + sec_size
             print("data start=" + str(module.section_range[SecDataID].start))
             print("data end=" + str(module.section_range[SecDataID].end))
-
             module.data_sec = self.read_data_sec()
 
     def read_type_sec(self):
-
         vec = []
         for _ in range(self.read_var_u32()):
             vec.append(self.read_func_type())
         return vec
 
     def read_import_sec(self):
-
         vec = []
         for _ in range(self.read_var_u32()):
             vec.append(self.read_import())
@@ -423,19 +390,15 @@ class WasmReader:
     def read_import_desc(self):
         desc = ImportDesc(self.read_byte())
         tag = desc.tag
-
         if tag == ImportTagFunc:
             desc.func_type = self.read_var_u32()
-
-
+        # table_type: 0x70|limits
         elif tag == ImportTagTable:
             desc.table = self.read_table_type()
-
-
+        # mem_type: limits
         elif tag == ImportTagMem:
             desc.mem = self.read_limits()
-
-
+        # global_type: val_type|mut
         elif tag == ImportTagGlobal:
             desc.global_type = self.read_global_type()
         else:
@@ -443,21 +406,18 @@ class WasmReader:
         return desc
 
     def read_table_sec(self):
-
         vec = []
         for _ in range(self.read_var_u32()):
             vec.append(self.read_table_type())
         return vec
 
     def read_mem_sec(self):
-
         vec = []
         for _ in range(self.read_var_u32()):
             vec.append(self.read_limits())
         return vec
 
     def read_global_sec(self):
-
         vec = []
         for _ in range(self.read_var_u32()):
             global_obj = Global(self.read_global_type(), self.read_expr())
@@ -465,7 +425,6 @@ class WasmReader:
         return vec
 
     def read_export_sec(self):
-
         vec = []
         for _ in range(self.read_var_u32()):
             vec.append(self.read_export())
@@ -482,12 +441,10 @@ class WasmReader:
         return desc
 
     def read_start_sec(self):
-
         idx = self.read_var_u32()
         return idx
 
     def read_elem_sec(self):
-
         vec = []
         for _ in range(self.read_var_u32()):
             vec.append(self.read_elem())
@@ -497,7 +454,6 @@ class WasmReader:
         return Elem(self.read_var_u32(), self.read_expr(), self.read_indices())
 
     def read_code_sec(self):
-
         vec = [Code()] * self.read_var_u32()
         for i in range(len(vec)):
             vec[i] = self.read_code(i)
@@ -523,7 +479,6 @@ class WasmReader:
         return Locals(self.read_var_u32(), self.read_val_type())
 
     def read_data_sec(self):
-
         vec = []
         for _ in range(self.read_var_u32()):
             vec.append(self.read_data())
@@ -540,14 +495,14 @@ class WasmReader:
 
     def read_val_type(self):
         vt = self.read_byte()
-        if vt not in [I32, I64, F32, F64]:
+        if vt not in [ValTypeI32, ValTypeI64, ValTypeF32, ValTypeF64, ValTypeV128]:
             raise Exception("malformed value type: %d" % vt)
         return vt
 
     def read_block_type(self):
         bt = self.read_var_s32()
         if bt < 0:
-            if bt not in [BlockTypeI32, BlockTypeI64, BlockTypeF32, BlockTypeF64, BlockTypeEmpty]:
+            if bt not in [BlockTypeI32, BlockTypeI64, BlockTypeF32, BlockTypeF64, BlockTypeV128, BlockTypeEmpty]:
                 raise Exception("malformed block type: %d" % bt)
 
         return bt
@@ -565,7 +520,7 @@ class WasmReader:
         return tt
 
     def read_global_type(self):
-
+        # 第二个参数为mut
         gt = GlobalType(self.read_val_type(), self.read_byte())
         if gt.mut not in [MutConst, MutVar]:
             raise Exception("malformed mutability: %d" % gt.mut)
@@ -596,16 +551,21 @@ class WasmReader:
             if instr.opcode == Else_ or instr.opcode == End_:
                 end = instr.opcode
                 return instrs, end
-
             instrs.append(instr)
 
     def read_instruction(self):
         instr = Instruction()
         instr.opcode = self.read_byte()
-
+        if instr.opcode == 0xFC:
+            instr.opcode = instr.opcode*256 + self.read_byte()
+        elif instr.opcode == 0xFD:
+            second_byte = self.read_byte()
+            if second_byte > 0x7F:
+                instr.opcode = instr.opcode * 256 * 256 + second_byte * 256 + self.read_byte()
+            else:
+                instr.opcode = instr.opcode * 256 + second_byte
         if opnames[instr.opcode] == "":
             raise Exception("undefined opcode: 0x%02x" % instr.opcode)
-
         instr.args = self.read_args(instr.opcode)
         return instr
 
@@ -636,15 +596,32 @@ class WasmReader:
             return self.read_f32()
         elif opcode == F64Const:
             return self.read_f64()
-        elif opcode == TruncSat:
-            return self.read_byte()
+        elif opcode == V128Const:
+            return self.read_v128()
+        elif opcode == I8x16Shuffle:
+            return self.read_v128()
+        elif I8x16ExtractLaneS <= opcode <= F64x2ReplaceLane:
+            return self.read_lane()
+        elif opcode in [RefNull, RefFunc]:
+            return self.read_var_u32()
+        elif opcode in [MemoryInit, DataDrop, ElemDrop, TableGrow, TableSize, TableFill]:
+            return self.read_var_u32()
+        elif opcode in [TableInit, TableCopy]:
+            x = self.read_var_u32()
+            y = self.read_var_u32()
+            return TableArg(x, y)
+        elif V128Load <= opcode <= V128Store or opcode in [V128Load32Zero, V128Load64Zero]:
+            return self.read_mem_arg()
+        elif V128Load8Lane <= opcode <= V128Store64Lane:
+            mem_arg = self.read_mem_arg()
+            laneidx = self.read_lane()
+            return MemLaneArg(mem_arg, laneidx)
+        elif I32Load <= opcode <= I64Store32:
+            return self.read_mem_arg()
         else:
-            if I32Load <= opcode <= I64Store32:
-                return self.read_mem_arg()
             return None
 
     def read_block_args(self):
-
         args = BlockArgs()
         args.bt = self.read_block_type()
         args.instrs, end = self.read_instructions()
@@ -653,7 +630,6 @@ class WasmReader:
         return args
 
     def read_if_args(self):
-
         args = IfArgs()
         args.bt = self.read_block_type()
         args.instrs1, end = self.read_instructions()
@@ -664,17 +640,14 @@ class WasmReader:
         return args
 
     def read_br_table_args(self):
-
         return BrTableArgs(self.read_indices(), self.read_var_u32())
 
     def read_call_indirect_args(self):
-
         type_idx = self.read_var_u32()
         self.read_zero()
         return type_idx
 
     def read_mem_arg(self):
-
         return MemArg(self.read_var_u32(), self.read_var_u32())
 
     def read_zero(self):

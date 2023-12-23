@@ -5,7 +5,7 @@ with open('README.md', encoding='UTF-16LE') as f:
   long_description = f.read()
 
 setup(name='BREWasm',
-      version='1.0.5',
+      version='1.0.6',
       description='A general purpose static binary rewriting framework for Wasm, which aims at reducing the complexity of the Wasm',
       long_description=long_description,
       install_requires=[

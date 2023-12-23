@@ -1,19 +1,21 @@
-I32 = 0x7F
+ValTypeI32 = 0x7F
+ValTypeI64 = 0x7E
+ValTypeF32 = 0x7D
+ValTypeF64 = 0x7C
+ValTypeV128 = 0x7B
 
-I64 = 0x7E
-
-F32 = 0x7D
-
-F64 = 0x7C
+ValTypeAny = 0x7C
 
 BlockTypeI32 = -1
 BlockTypeI64 = -2
 BlockTypeF32 = -3
 BlockTypeF64 = -4
+BlockTypeV128 = -5
 BlockTypeEmpty = -64
 
 FtTag = 0x60
 FuncRef = 0x70
+ExternRef = 0x6F
 
 MutConst = 0
 MutVar = 1

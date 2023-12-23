@@ -56,32 +56,32 @@ class Type:
                 match arg:
                     # I32
                     case 127:
-                        param_types.append(I32)
+                        param_types.append(ValTypeI32)
                     # I64
                     case 126:
-                        param_types.append(I64)
+                        param_types.append(ValTypeI32)
                     # F32
                     case 125:
-                        param_types.append(F32)
+                        param_types.append(ValTypeF32)
                     # F64
                     case 124:
-                        param_types.append(F64)
+                        param_types.append(ValTypeF64)
 
         if self.ret_types is not None:
             for arg in self.ret_types:
                 match arg:
                     # I32
                     case 127:
-                        result_types.append(I32)
+                        result_types.append(ValTypeI32)
                     # I64
                     case 126:
-                        result_types.append(I64)
+                        result_types.append(ValTypeI32)
                     # F32
                     case 125:
-                        result_types.append(F32)
+                        result_types.append(ValTypeF32)
                     # F64
                     case 124:
-                        result_types.append(F64)
+                        result_types.append(ValTypeF64)
 
         return FuncType(FtTag, param_types, result_types)
 

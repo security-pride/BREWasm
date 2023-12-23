@@ -1,5 +1,5 @@
 from ..parser.types import BlockTypeI32, BlockTypeI64, BlockTypeF32, BlockTypeF64, BlockTypeEmpty, FuncType, \
-    I32, I64, F32, F64
+    ValTypeI32, ValTypeI64, ValTypeF32, ValTypeF64
 
 MagicNumber = 0x6D736100
 
@@ -95,13 +95,13 @@ class Module:
     def get_block_type(self, bt):
 
         if bt == BlockTypeI32:
-            return FuncType(result_types=[I32])
+            return FuncType(result_types=[ValTypeI32])
         elif bt == BlockTypeI64:
             return FuncType(result_types=[ValTypeI64])
         elif bt == BlockTypeF32:
-            return FuncType(result_types=[F32])
+            return FuncType(result_types=[ValTypeF32])
         elif bt == BlockTypeF64:
-            return FuncType(result_types=[F64])
+            return FuncType(result_types=[ValTypeF64])
         elif bt == BlockTypeEmpty:
             return FuncType()
         else:
@@ -126,11 +126,6 @@ class CustomSec:
 
 
 class NameData:
-    """
-    name_data: modulenamesubsec?|funcnamesubsec?|localnamesubsec?
-    funcnamesubsec: 0x01|byte_count|namemap
-    """
-
     def __init__(self, moduleNameSubSec=None, funcNameSubSec=None, globalNameSubSec=None, dataNameSubSec=None,
                  tableNameSubSec=None,
                  local_bytes=None, labels_bytes=None, type_bytes=None, memory_bytes=None, elem_bytes=None):

@@ -53,3 +53,16 @@ class MemArg:
         self.align = align
 
         self.offset = offset
+
+class TableArg:
+
+    def __init__(self, x=0, y=0):
+        self.x = x
+        self.y = y
+
+
+class MemLaneArg:
+
+    def __init__(self, mem_arg=None, laneidx=0):
+        self.mem_arg = mem_arg
+        self.laneidx = laneidx
