@@ -1,6 +1,6 @@
 from ..parser.opcodes import *
 
-opnames = [""] * 256
+opnames = [""] * 0xFFFFFF
 
 opnames[Unreachable] = "unreachable"
 opnames[Nop] = "nop"
