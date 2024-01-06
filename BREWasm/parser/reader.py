@@ -498,11 +498,11 @@ class WasmReader:
     def read_data(self):
         data_type = self.read_var_u32()
         if data_type == 0:
-            return Data(self.read_expr(), self.read_bytes())
+            return Data(offset_expr=self.read_expr(), vec_init=self.read_bytes())
         elif data_type == 1:
-            return Data(self.read_bytes())
+            return Data(vec_init=self.read_bytes())
         elif data_type == 2:
-            return Data(self.read_var_u32(), self.read_expr(), self.read_bytes())
+            return Data(mem_idx=self.read_var_u32(), offset_expr=self.read_expr(), vec_init=self.read_bytes())
 
     def read_val_types(self):
         vec = []
