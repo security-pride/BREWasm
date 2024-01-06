@@ -18,7 +18,7 @@ class ModifyBinary:
             if err is not None:
                 print(err.args)
                 print("=================================")
-                raise Exception("Failed to read the wasm file!")
+                raise Exception("Failed to read the wasm file!  " + err.args)
 
             self.module = module
             self.module.path = path
@@ -59,6 +59,7 @@ class ModifyBinary:
         self.modify_elem_section(self.module.elem_sec, file_path)
         self.modify_code_section(self.module.code_sec, file_path)
         self.modify_data_section(self.module.data_sec, file_path)
+        self.modify_datacount_section(self.module.datacount_sec, file_path)
 
 
     def get_import_func_list(self):
@@ -705,6 +706,32 @@ class ModifyBinary:
         f.write(file_new_bytes)
         f.close()
         return data_section_bytes
+
+    def modify_datacount_section(self, datacount: int, file_path):
+        if datacount != None:
+            datacount_bytes = LEB128U.encode(datacount)
+            datacount_section_bytes = bytes([SecDataCountID]) + LEB128U.encode(len(datacount_bytes)) + datacount_bytes
+
+            if os.path.isfile(file_path):
+                f = open(file_path, "r+b")
+            else:
+                f = open(file_path, "w+b")
+            file_bytes = f.read()
+            file_new_bytes = file_bytes[
+                             :self.module.section_range[SecDataCountID].start] + datacount_section_bytes + file_bytes[
+                                                                                                     self.module.section_range[
+                                                                                                         SecDataCountID].end:]
+            change = len(datacount_section_bytes) - (
+                    self.module.section_range[SecDataCountID].end - self.module.section_range[SecDataCountID].start)
+
+            self.module.section_range[SecDataCountID].end = self.module.section_range[SecDataCountID].start + len(
+                datacount_section_bytes)
+            self.fix_section_range(SecDataCountID, change, self.module.section_range[SecDataCountID].start)
+            f.seek(0)
+            f.truncate()
+            f.write(file_new_bytes)
+            f.close()
+            return datacount_section_bytes
 
     def modify_elem_section(self, elem_vec: list, file_path):
 

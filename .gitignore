@@ -1,0 +1,10 @@
+
+.idea/
+.vscode/
+BREWasm.egg-info/
+BREWasm/__pycache__/
+BREWasm/parser/__pycache__/
+BREWasm/rewriter/__pycache__/
+BREWasm/test/
+build/
+dist/

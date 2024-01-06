@@ -29,6 +29,8 @@ SecCodeID = 10
 
 SecDataID = 11
 
+SecDataCountID = 12
+
 ImportTagFunc = 0
 ImportTagTable = 1
 ImportTagMem = 2
@@ -87,9 +89,11 @@ class Module:
 
         self.data_sec = []
 
+        self.datacount_sec = None
+
         self.section_range = []
         self.section_range.append([])
-        for i in range(11):
+        for i in range(12):
             self.section_range.append(SectionRange())
 
     def get_block_type(self, bt):

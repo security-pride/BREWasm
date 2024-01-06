@@ -5,7 +5,7 @@ from ..parser.instruction import Instruction, BlockArgs, IfArgs, BrTableArgs, Me
 from ..parser.module import Import, ImportDesc, ImportTagFunc, ImportTagTable, ImportTagMem, ImportTagGlobal, \
     Global, Export, ExportDesc, ExportTagFunc, ExportTagTable, ExportTagMem, ExportTagGlobal, Elem, Code, Locals, \
     Data, MagicNumber, Version, Module, SecCustomID, SecDataID, CustomSec, SecTypeID, SecImportID, SecFuncID, \
-    SecTableID, SecMemID, SecGlobalID, SecExportID, SecStartID, SecElemID, SecCodeID, NameData, SectionRange
+    SecTableID, SecMemID, SecGlobalID, SecExportID, SecStartID, SecElemID, SecCodeID, SecDataCountID, NameData, SectionRange
 from ..parser.opcodes import *
 from ..parser.opnames import opnames
 from ..parser.types import ValTypeI32, ValTypeI64, ValTypeF32, ValTypeF64, ValTypeV128, FuncType, FtTag, TableType, \
@@ -18,7 +18,6 @@ from ..parser.leb128 import *
 def decode_file(file_name: str):
     data, err = None, None
     try:
-
         f = open(file_name, 'rb+')
         data = f.read()
         f.seek(0)
@@ -161,9 +160,9 @@ class WasmReader:
                 module.section_range[SecCustomID].append(SectionRange(start, end, custom_sec_name))
                 module.custom_secs.append(custom_sec)
                 continue
-            if sec_id > SecDataID:
+            if sec_id > SecDataCountID:
                 raise Exception("malformed section id: %d" % sec_id)
-            if sec_id <= prev_sec_id:
+            if sec_id <= prev_sec_id and prev_sec_id != SecDataCountID:
                 raise Exception("junk after last section, id: %d" % sec_id)
             prev_sec_id = sec_id
             n, w = decode_var_uint(self.reader, 32)
@@ -171,6 +170,7 @@ class WasmReader:
             self.read_non_custom_sec(sec_id, module, n, w)
             remain = self.remaining()
             if remain + int(n) != remaining_before_read:
+                breakpoint()
                 raise Exception("section size mismatch, id: %d" % sec_id)
 
     def read_custom_sec(self, sec_size):
@@ -371,6 +371,13 @@ class WasmReader:
             print("data start=" + str(module.section_range[SecDataID].start))
             print("data end=" + str(module.section_range[SecDataID].end))
             module.data_sec = self.read_data_sec()
+        elif sec_id == SecDataCountID:
+            # bug
+            module.section_range[SecDataCountID].start = self.reader.tell() - byte_count_size - 1
+            module.section_range[SecDataCountID].end = self.reader.tell() + sec_size
+            print("data start=" + str(module.section_range[SecDataCountID].start))
+            print("data end=" + str(module.section_range[SecDataCountID].end))
+            module.datacount_sec = self.read_datacount_sec()
 
     def read_type_sec(self):
         vec = []
@@ -484,8 +491,18 @@ class WasmReader:
             vec.append(self.read_data())
         return vec
 
+    def read_datacount_sec(self):
+        n = self.read_var_u32()
+        return n
+
     def read_data(self):
-        return Data(self.read_var_u32(), self.read_expr(), self.read_bytes())
+        data_type = self.read_var_u32()
+        if data_type == 0:
+            return Data(self.read_expr(), self.read_bytes())
+        elif data_type == 1:
+            return Data(self.read_bytes())
+        elif data_type == 2:
+            return Data(self.read_var_u32(), self.read_expr(), self.read_bytes())
 
     def read_val_types(self):
         vec = []
@@ -528,7 +545,7 @@ class WasmReader:
 
     def read_limits(self):
         limits = Limits(self.read_byte(), self.read_var_u32())
-        if limits.tag == 1:
+        if limits.tag in [1, 3]:
             limits.max = self.read_var_u32()
         return limits
 
