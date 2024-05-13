@@ -1026,11 +1026,25 @@ class ModifyBinary:
 
     def write_instruction(self, instr):
 
-        instruction_bytes = bytes()
-        instruction_bytes += bytes([instr.opcode])
+        binary_data = bytes()
+
+        if instr.opcode < 0xFC:
+            binary_data += bytes([instr.opcode])
+
+
+        elif instr.opcode <= 0xFD7F:
+            binary_data += instr.opcode.to_bytes(2, 'big')
+
+
+        elif instr.opcode <= 0xFDFF01:
+            binary_data += instr.opcode.to_bytes(3, 'big')
+
+        else:
+            raise Exception("Invalid opcode: 0x%02x" % instr.opcode)
+
         args_bytes = self.write_args(instr)
-        if args_bytes is not None:
-            instruction_bytes += args_bytes
+        if args_bytes != None:
+            binary_data += args_bytes
 
         return instruction_bytes
 
