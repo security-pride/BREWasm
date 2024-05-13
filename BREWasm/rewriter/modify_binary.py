@@ -1046,7 +1046,7 @@ class ModifyBinary:
         if args_bytes != None:
             binary_data += args_bytes
 
-        return instruction_bytes
+        return binary_data
 
     def write_args(self, instr):
 
