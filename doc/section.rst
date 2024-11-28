@@ -6,19 +6,19 @@ Section Rewriter API
 Constants
 ===================
 
-.. data:: I32
+.. data:: ValTypeI32
 
    32-bit integer type.
 
-.. data:: I64
+.. data:: ValTypeI64
 
    64-bit integer type.
 
-.. data:: F32
+.. data:: ValTypeF32
 
    32-bit floating point type.
 
-.. data:: F64
+.. data:: ValTypeF64
 
    64-bit floating point type.
 
@@ -85,7 +85,7 @@ SectionRewriter
       :type query: As function *insert*.
 
       :param new_item: The new element.
-      :type new_item: If you only want to update a certain property, you don't need to specify other irrelevant parameters. For example, ``Type(arg_types=[I32, I64])``
+      :type new_item: If you only want to update a certain property, you don't need to specify other irrelevant parameters. For example, ``Type(arg_types=[ValTypeI32, ValTypeI64])``
 
    .. function:: delete(query):
 
@@ -112,11 +112,11 @@ Type section
 
    .. attribute:: arg_types
       
-      The argument of the type. Example: ```arg_types=[I32, F32]```
+      The argument of the type. Example: ```arg_types=[ValTypeI32, ValTypeF32]```
 
    .. attribute:: ret_types
 
-      The return of the type. Example: ```ret_types=[I32, F32]```
+      The return of the type. Example: ```ret_types=[ValTypeI32, ValTypeF32]```
 
 
 Import section
@@ -201,7 +201,7 @@ Global section
 
    .. attribute:: valtype
 
-      The value type of the global variable. Example: ```valtype=I32```
+      The value type of the global variable. Example: ```valtype=ValTypeI32```
 
    .. attribute:: mut
 

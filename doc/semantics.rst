@@ -27,10 +27,10 @@ Global Variable
 
       :param global_type: The type of the global variable. Value type:
 
-      * I32
-      * I64
-      * F32
-      * F64
+      * ValTypeI32
+      * ValTypeI64
+      * ValTypeF32
+      * ValTypeF64
 
       :param init_value: The initial value of the global variable (`int` or `float`).
 
@@ -83,9 +83,9 @@ Import & Export
 
       :param func_name: The function name of the import function to be inserted (`str`).
 
-      :param params_type: The parameters type of the function. For example, `params_type=[I32, I64]`.
+      :param params_type: The parameters type of the function. For example, `params_type=[ValTypeI32, ValTypeI64]`.
 
-      :param results_type: The return value type of the function. For example, `results_type=[F32, I64]`.
+      :param results_type: The return value type of the function. For example, `results_type=[ValTypeF32, ValTypeI64]`.
 
    .. function:: appendImportFunction  (module_name, func_name, params_type, results_type):
 
@@ -215,7 +215,7 @@ Function
          # Define the instructions of function
          func_body = [Instruction(LocalGet, 0), Instruction(LocalGet, 1), Instruction(I32Add, 0), Instruction(Nop)]
          # Insert a internal function in the binary
-         function_rewriter.insert_internal_function(idx=1, params_type=[I32, I32], results_type=[I32], local_vec=[Local(0, I32), Local(1, I64)], func_body=uncbody)
+         function_rewriter.insert_internal_function(idx=1, params_type=[ValTypeI32, ValTypeI32], results_type=[ValTypeI32], local_vec=[Local(0, ValTypeI32), Local(1, ValTypeI64)], func_body=uncbody)
 
 
    .. function:: insertIndirectFunction   (idx, params_type, results_type, local_vec, func_body):
