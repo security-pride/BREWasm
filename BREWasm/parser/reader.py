@@ -305,78 +305,79 @@ class WasmReader:
         return name_data
 
     def read_non_custom_sec(self, sec_id, module, sec_size, byte_count_size):
+        # print("Paring the wasm binary:")
         if sec_id == SecTypeID:
             module.section_range[SecTypeID].start = self.reader.tell() - byte_count_size - 1
             module.section_range[SecTypeID].end = self.reader.tell() + sec_size
-            print("type start=" + str(module.section_range[SecTypeID].start))
-            print("type end=" + str(module.section_range[SecTypeID].end))
+            # print("type start=" + str(module.section_range[SecTypeID].start))
+            # print("type end=" + str(module.section_range[SecTypeID].end))
             module.type_sec = self.read_type_sec()
         elif sec_id == SecImportID:
             module.section_range[SecImportID].start = self.reader.tell() - byte_count_size - 1
             module.section_range[SecImportID].end = self.reader.tell() + sec_size
-            print("import start=" + str(module.section_range[SecImportID].start))
-            print("import end=" + str(module.section_range[SecImportID].end))
+            # print("import start=" + str(module.section_range[SecImportID].start))
+            # print("import end=" + str(module.section_range[SecImportID].end))
             module.import_sec = self.read_import_sec()
         elif sec_id == SecFuncID:
             module.section_range[SecFuncID].start = self.reader.tell() - byte_count_size - 1
             module.section_range[SecFuncID].end = self.reader.tell() + sec_size
-            print("func start=" + str(module.section_range[SecFuncID].start))
-            print("func end=" + str(module.section_range[SecFuncID].end))
+            # print("func start=" + str(module.section_range[SecFuncID].start))
+            # print("func end=" + str(module.section_range[SecFuncID].end))
             module.func_sec = self.read_indices()
         elif sec_id == SecTableID:
             module.section_range[SecTableID].start = self.reader.tell() - byte_count_size - 1
             module.section_range[SecTableID].end = self.reader.tell() + sec_size
-            print("table start=" + str(module.section_range[SecTableID].start))
-            print("table end=" + str(module.section_range[SecTableID].end))
+            # print("table start=" + str(module.section_range[SecTableID].start))
+            # print("table end=" + str(module.section_range[SecTableID].end))
             module.table_sec = self.read_table_sec()
         elif sec_id == SecMemID:
             module.section_range[SecMemID].start = self.reader.tell() - byte_count_size - 1
             module.section_range[SecMemID].end = self.reader.tell() + sec_size
-            print("mem start=" + str(module.section_range[SecMemID].start))
-            print("mem end=" + str(module.section_range[SecMemID].end))
+            # print("mem start=" + str(module.section_range[SecMemID].start))
+            # print("mem end=" + str(module.section_range[SecMemID].end))
             module.mem_sec = self.read_mem_sec()
         elif sec_id == SecGlobalID:
             module.section_range[SecGlobalID].start = self.reader.tell() - byte_count_size - 1
             module.section_range[SecGlobalID].end = self.reader.tell() + sec_size
-            print("global start=" + str(module.section_range[SecGlobalID].start))
-            print("global end=" + str(module.section_range[SecGlobalID].end))
+            # print("global start=" + str(module.section_range[SecGlobalID].start))
+            # print("global end=" + str(module.section_range[SecGlobalID].end))
             module.global_sec = self.read_global_sec()
         elif sec_id == SecExportID:
             module.section_range[SecExportID].start = self.reader.tell() - byte_count_size - 1
             module.section_range[SecExportID].end = self.reader.tell() + sec_size
-            print("export start=" + str(module.section_range[SecExportID].start))
-            print("export end=" + str(module.section_range[SecExportID].end))
+            # print("export start=" + str(module.section_range[SecExportID].start))
+            # print("export end=" + str(module.section_range[SecExportID].end))
             module.export_sec = self.read_export_sec()
         elif sec_id == SecStartID:
             module.section_range[SecStartID].start = self.reader.tell() - byte_count_size - 1
             module.section_range[SecStartID].end = self.reader.tell() + sec_size
-            print("start start=" + str(module.section_range[SecStartID].start))
-            print("start end=" + str(module.section_range[SecStartID].end))
+            # print("start start=" + str(module.section_range[SecStartID].start))
+            # print("start end=" + str(module.section_range[SecStartID].end))
             module.start_sec = self.read_start_sec()
         elif sec_id == SecElemID:
             module.section_range[SecElemID].start = self.reader.tell() - byte_count_size - 1
             module.section_range[SecElemID].end = self.reader.tell() + sec_size
-            print("elem start=" + str(module.section_range[SecElemID].start))
-            print("elem end=" + str(module.section_range[SecElemID].end))
+            # print("elem start=" + str(module.section_range[SecElemID].start))
+            # print("elem end=" + str(module.section_range[SecElemID].end))
             module.elem_sec = self.read_elem_sec()
         elif sec_id == SecCodeID:
             module.section_range[SecCodeID].start = self.reader.tell() - byte_count_size - 1
             module.section_range[SecCodeID].end = self.reader.tell() + sec_size
-            print("code start=" + str(module.section_range[SecCodeID].start))
-            print("code end=" + str(module.section_range[SecCodeID].end))
+            # print("code start=" + str(module.section_range[SecCodeID].start))
+            # print("code end=" + str(module.section_range[SecCodeID].end))
             module.code_sec = self.read_code_sec()
         elif sec_id == SecDataID:
             module.section_range[SecDataID].start = self.reader.tell() - byte_count_size - 1
             module.section_range[SecDataID].end = self.reader.tell() + sec_size
-            print("data start=" + str(module.section_range[SecDataID].start))
-            print("data end=" + str(module.section_range[SecDataID].end))
+            # print("data start=" + str(module.section_range[SecDataID].start))
+            # print("data end=" + str(module.section_range[SecDataID].end))
             module.data_sec = self.read_data_sec()
         elif sec_id == SecDataCountID:
             # bug
             module.section_range[SecDataCountID].start = self.reader.tell() - byte_count_size - 1
             module.section_range[SecDataCountID].end = self.reader.tell() + sec_size
-            print("data start=" + str(module.section_range[SecDataCountID].start))
-            print("data end=" + str(module.section_range[SecDataCountID].end))
+            # print("data start=" + str(module.section_range[SecDataCountID].start))
+            # print("data end=" + str(module.section_range[SecDataCountID].end))
             module.datacount_sec = self.read_datacount_sec()
 
     def read_type_sec(self):

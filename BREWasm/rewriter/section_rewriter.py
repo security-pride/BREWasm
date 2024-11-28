@@ -427,13 +427,16 @@ class SectionRewriter:
 
         elif self.datasec is not None and isinstance(inserted_item, Data):
             data_list = []
-            for idx, item in enumerate(self.module.data_sec):
-                if all(
-                        (query.dataidx is None or query.dataidx == idx,
-                         query.offset is None or query.offset == item.offset[0].args)
-                ):
-                    data_list.append(Data(idx, item.offset[0].args, item.init))
-            return data_list
+            if query is None:
+                self.module.data_sec.append(module.Data(inserted_item.dataidx, Instruction(I32Const, inserted_item.offset), inserted_item.init_data))
+            else:
+                for idx, item in enumerate(self.module.data_sec):
+                    if all(
+                            (query.dataidx is None or query.dataidx == idx,
+                             query.offset is None or query.offset == item.offset[0].args)
+                    ):
+                        data_list.append(Data(idx, item.offset[0].args, item.init))
+                return data_list
 
         elif self.datacountsec is not None:
             pass

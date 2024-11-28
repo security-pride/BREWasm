@@ -58,22 +58,22 @@ class FuncType:
         arg_types = []
         ret_types = []
         for valtype in self.param_types:
-            if valtype == I32:
+            if valtype == ValTypeI32:
                 arg_types.append("i32")
-            elif valtype == I64:
+            elif valtype == ValTypeI64:
                 arg_types.append("i64")
-            elif valtype == F32:
+            elif valtype == ValTypeF32:
                 arg_types.append("f32")
-            elif valtype == F64:
+            elif valtype == ValTypeF64:
                 arg_types.append("f64")
         for valtype in self.result_types:
-            if valtype == I32:
+            if valtype == ValTypeI32:
                 ret_types.append("i32")
-            elif valtype == I64:
+            elif valtype == ValTypeI64:
                 ret_types.append("i64")
-            elif valtype == F32:
+            elif valtype == ValTypeF32:
                 ret_types.append("f32")
-            elif valtype == F64:
+            elif valtype == ValTypeF64:
                 ret_types.append("f64")
         return arg_types, ret_types
 
